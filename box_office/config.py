@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from pathlib import Path
 
 from pydantic import Field
@@ -24,4 +25,12 @@ class Settings(BaseSettings):
     omdb_max_workers: int = Field(default=8, ge=1)  # concurrency for the OMDb fetch
 
 
-settings = Settings()
+@lru_cache
+def get_settings() -> Settings:
+    """Lazily build (and cache) Settings.
+
+    Deferred so importing this module — and everything that transitively
+    imports it — doesn't require a valid OMDB_API_KEY. Tests and OMDb-free
+    code paths can run without the key; the env is only read on first call.
+    """
+    return Settings()

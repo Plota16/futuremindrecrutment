@@ -10,16 +10,8 @@ from typing import Iterable
 
 from sqlmodel import Session, select
 
+from ..constants import RATING_SOURCES, UNKNOWN_ID
 from ..models import DimDistributor, DimGenre, DimPerson, DimRatingSource
-
-UNKNOWN_ID = 0   # conventional "Unknown" member; real surrogates autoincrement from 1
-
-# (source_id, name, scale_max, scale_unit) — name matches OMDb Ratings[].Source
-_RATING_SOURCES = [
-    (1, "Internet Movie Database", 10, "decimal"),
-    (2, "Rotten Tomatoes", 100, "percentage"),
-    (3, "Metacritic", 100, "points"),
-]
 
 
 class ReferenceRepository:
@@ -47,7 +39,7 @@ class ReferenceRepository:
 
     def seed_rating_sources(self) -> dict[str, int]:
         existing = {r.source_name: r.source_id for r in self.session.exec(select(DimRatingSource)).all()}
-        for source_id, name, scale_max, scale_unit in _RATING_SOURCES:
+        for source_id, name, scale_max, scale_unit in RATING_SOURCES:
             if name not in existing:
                 self.session.add(
                     DimRatingSource(source_id=source_id, source_name=name, scale_max=scale_max, scale_unit=scale_unit)

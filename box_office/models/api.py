@@ -8,15 +8,11 @@ from pydantic import BaseModel
 
 
 class CsvLoadSummary(BaseModel):
-    """Phase 1 — CSV landed into bronze."""
-
     rows_read: int
     duration_ms: int
 
 
 class OmdbLoadSummary(BaseModel):
-    """Phase 2 — OMDb bronze cache fill."""
-
     omdb_requested: int
     omdb_skipped_cached: int
     omdb_calls: int
@@ -26,8 +22,6 @@ class OmdbLoadSummary(BaseModel):
 
 
 class SilverSummary(BaseModel):
-    """Phase 3 — silver rebuilt from the current bronze state."""
-
     dates_added: int
     movies: int
     fact_revenue_rows: int

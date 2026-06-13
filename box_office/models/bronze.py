@@ -12,7 +12,7 @@ class BronzeRevenueCsv(DwhTable, table=True):
     __tablename__ = "bronze_revenue_csv"
 
     bronze_revenue_id: Optional[int] = Field(default=None, primary_key=True)
-    row_uuid: str  # original CSV `id` (not indexed — never queried by it)
+    row_uuid: str
     event_date: date
     title: str = Field(index=True)
     revenue: int
@@ -26,5 +26,5 @@ class BronzeOmdbRaw(DwhTable, table=True):
 
     bronze_omdb_id: Optional[int] = Field(default=None, primary_key=True)
     title_queried: str = Field(index=True)
-    found: bool = Field(default=False)  # OMDb "Response"
+    found: bool = Field(default=False)
     response_json: str

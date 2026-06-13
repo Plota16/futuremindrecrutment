@@ -16,7 +16,6 @@ class BronzeResult:
 
 @dataclass
 class SilverCoreResult:
-    """Silver built from the CSV bronze only (no API dependency)."""
 
     dates_added: int
     movies: int
@@ -25,7 +24,6 @@ class SilverCoreResult:
 
 @dataclass
 class SilverEnrichmentResult:
-    """Silver built from whatever is currently in the OMDb bronze cache."""
 
     movies_enriched: int
     rating_snapshots: int

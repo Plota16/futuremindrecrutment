@@ -2,17 +2,14 @@
 
 from __future__ import annotations
 
-from sqlmodel import Session
-
 from ..models import DimMovie
 from ..models.base import utcnow
 from ..models.omdb import ParsedMovie
 from ..repositories import MovieRepository
 
 
-def ensure_movies(titles, session: Session) -> dict[str, int]:
+def ensure_movies(titles, repo: MovieRepository) -> dict[str, int]:
     """Ensure a dim_movie row exists for every title (bare if not OMDb-enriched). Returns title->id."""
-    repo = MovieRepository(session)
     existing = repo.title_to_id()
     new = [DimMovie(title=t) for t in sorted({x for x in titles if x}) if t not in existing]
     if new:
@@ -24,12 +21,11 @@ def ensure_movies(titles, session: Session) -> dict[str, int]:
 
 def upsert_movie(
     parsed: ParsedMovie,
-    session: Session,
+    repo: MovieRepository,
     genre_ids: dict[str, int],
     person_ids: dict[str, int],
 ) -> int:
     """Insert or overwrite the movie by its title; rebuild its bridges. Returns movie_id."""
-    repo = MovieRepository(session)
     movie = repo.get_by_title(parsed.title)
     if movie is None:
         movie = DimMovie(title=parsed.title)

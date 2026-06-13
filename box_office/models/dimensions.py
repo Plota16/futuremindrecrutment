@@ -13,7 +13,7 @@ from .base import DwhTable
 class DimDate(DwhTable, table=True):
     __tablename__ = "dim_date"
 
-    date_id: int = Field(primary_key=True, sa_column_kwargs={"autoincrement": False})  # YYYYMMDD
+    date_id: int = Field(primary_key=True, sa_column_kwargs={"autoincrement": False})
     full_date: date = Field(index=True, unique=True)
     is_weekend: bool = Field(default=False)
     is_holiday: bool = Field(default=False)
@@ -54,7 +54,7 @@ class DimMovie(DwhTable, table=True):
     __tablename__ = "dim_movie"
 
     movie_id: Optional[int] = Field(default=None, primary_key=True)
-    title: str = Field(index=True, unique=True)   # natural key
+    title: str = Field(index=True, unique=True)
     released_date: Optional[date] = None
     runtime_min: Optional[int] = None
     plot: Optional[str] = None

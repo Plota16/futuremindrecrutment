@@ -51,7 +51,7 @@ class OmdbRepository:
         if not total:
             return OmdbFetchStats(requested, skipped, 0, 0, 0)
 
-        workers = min(max_workers or config.settings.omdb_max_workers, total)
+        workers = min(max_workers or config.get_settings().omdb_max_workers, total)
         logger.info("omdb fetch: start (%d titles, force=%s, workers=%d)", total, force, workers)
 
         found = not_found = 0
@@ -59,9 +59,9 @@ class OmdbRepository:
             futures = {pool.submit(self._safe_fetch, title): title for title in pending}
             for i, future in enumerate(as_completed(futures), 1):
                 title = futures[future]
-                result = future.result()  # _safe_fetch never raises
+                result = future.result()
                 if result is None:
-                    not_found += 1  # transient failure: not cached, retried next run
+                    not_found += 1
                 else:
                     self.session.add(
                         BronzeOmdbRaw(title_queried=title, found=result.found, response_json=result.raw_json)

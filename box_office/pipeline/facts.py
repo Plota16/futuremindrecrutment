@@ -4,25 +4,24 @@ from __future__ import annotations
 
 import pandas as pd
 
-from sqlmodel import Session
-
+from ..constants import IMDB_SOURCE, UNKNOWN_ID
 from ..models.base import utcnow
 from ..repositories import FactRepository, MovieRepository, ReferenceRepository
-from ..repositories.reference import UNKNOWN_ID
-
-IMDB_SOURCE = "Internet Movie Database"
 
 
-def build_daily_revenue(session: Session) -> int:
+def build_daily_revenue(
+    facts: FactRepository,
+    movies: MovieRepository,
+    reference: ReferenceRepository,
+) -> int:
     """Rebuild fact_daily_revenue from bronze: resolve movie/date/distributor, aggregate to grain."""
-    facts = FactRepository(session)
     rows = facts.read_revenue_grain()
     df = pd.DataFrame(rows, columns=["title", "event_date", "revenue", "theaters", "distributor"])
     if df.empty:
         return 0
 
-    movie_ids = MovieRepository(session).title_to_id()
-    dist_ids = ReferenceRepository(session).distributor_map()
+    movie_ids = movies.title_to_id()
+    dist_ids = reference.distributor_map()
 
     df["movie_id"] = df["title"].map(movie_ids)
     df = df.dropna(subset=["movie_id"])
@@ -45,12 +44,13 @@ def build_daily_revenue(session: Session) -> int:
     return len(agg)
 
 
-def write_rating_snapshots(items, source_ids: dict[str, int], snapshot_date_id: int, session: Session) -> int:
+def write_rating_snapshots(
+    items, source_ids: dict[str, int], snapshot_date_id: int, facts: FactRepository
+) -> int:
     """Write one rating snapshot per (movie, source) for snapshot_date_id (idempotent for the day).
 
     `items` is an iterable of (movie_id, ParsedMovie). votes attach to the IMDb row only.
     """
-    facts = FactRepository(session)
     facts.delete_rating_snapshots(snapshot_date_id)
 
     count = 0

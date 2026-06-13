@@ -10,12 +10,11 @@ import pandas as pd
 from sqlalchemy import delete, func
 from sqlmodel import Session, select
 
+from ..constants import CSV_COLUMNS
 from ..models import BronzeRevenueCsv
 from ..models.base import utcnow
 
 logger = logging.getLogger(__name__)
-
-_CSV_COLUMNS = ["id", "date", "title", "revenue", "theaters", "distributor"]
 
 
 class RevenueRepository:
@@ -25,7 +24,7 @@ class RevenueRepository:
     def load_csv(self, path: str | Path) -> int:
         """Load the CSV 1:1 into bronze_revenue_csv. Re-loading the same file replaces it."""
         name = Path(path).name
-        df = pd.read_csv(path, usecols=_CSV_COLUMNS, parse_dates=["date"])
+        df = pd.read_csv(path, usecols=CSV_COLUMNS, parse_dates=["date"])
         df = df.rename(columns={"id": "row_uuid", "date": "event_date"})
         df["event_date"] = df["event_date"].dt.date
         df["source_file"] = name

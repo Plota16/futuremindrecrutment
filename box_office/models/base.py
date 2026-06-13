@@ -10,6 +10,5 @@ def utcnow() -> datetime:
 
 
 class DwhTable(SQLModel):
-    """Base for all warehouse tables — carries the ETL load timestamp."""
 
     load_timestamp: datetime = Field(default_factory=utcnow, nullable=False)

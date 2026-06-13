@@ -22,8 +22,15 @@ from ..models.results import (
     SilverEnrichmentResult,
     SilverResult,
 )
-from ..repositories import OmdbRepository, ReferenceRepository, RevenueRepository
-from . import calendar, facts, movies, reference
+from ..repositories import (
+    DateRepository,
+    FactRepository,
+    MovieRepository,
+    OmdbRepository,
+    ReferenceRepository,
+    RevenueRepository,
+)
+from . import calendar, facts, movies
 
 logger = logging.getLogger(__name__)
 
@@ -41,8 +48,14 @@ def bootstrap() -> None:
 class BoxOfficeETL:
     def __init__(self, session: Session, omdb_client: Optional[OmdbClient] = None):
         self.session = session
+        # The orchestrator owns every repository; pipeline steps receive these
+        # instances rather than newing up their own from a bare session.
         self.revenue = RevenueRepository(session)
         self.omdb = OmdbRepository(session, client=omdb_client)
+        self.movies = MovieRepository(session)
+        self.facts = FactRepository(session)
+        self.reference = ReferenceRepository(session)
+        self.dates = DateRepository(session)
 
     def run(
         self,
@@ -97,11 +110,11 @@ class BoxOfficeETL:
         logger.info("silver core: start")
         session = self.session
         today = date.today()
-        dates_added = calendar.ensure_dates(list(self.revenue.distinct_event_dates()) + [today], session)
-        reference.ensure_unknown_members(session)
-        reference.upsert_distributors(self.revenue.distinct_distributors(), session)
-        movie_ids = movies.ensure_movies(self.revenue.distinct_titles(), session)
-        revenue_rows = facts.build_daily_revenue(session)
+        dates_added = calendar.ensure_dates(list(self.revenue.distinct_event_dates()) + [today], self.dates)
+        self.reference.ensure_unknown_members()
+        self.reference.upsert_distributors(self.revenue.distinct_distributors())
+        movie_ids = movies.ensure_movies(self.revenue.distinct_titles(), self.movies)
+        revenue_rows = facts.build_daily_revenue(self.facts, self.movies, self.reference)
         session.commit()
         logger.info("silver core: done (movies=%d, revenue_rows=%d)", len(movie_ids), revenue_rows)
         return SilverCoreResult(dates_added, len(movie_ids), revenue_rows)
@@ -115,15 +128,15 @@ class BoxOfficeETL:
         logger.info("silver enrichment: start")
         session = self.session
         today = date.today()
-        calendar.ensure_dates([today], session)
-        source_ids = reference.seed_rating_sources(session)
+        calendar.ensure_dates([today], self.dates)
+        source_ids = self.reference.seed_rating_sources()
 
         parsed_list = [parse_omdb(payload, title) for title, payload in self.omdb.found()]
-        genre_ids = reference.upsert_genres({g for p in parsed_list for g in p.genres}, session)
-        person_ids = reference.upsert_persons({n for p in parsed_list for n, _ in p.persons}, session)
-        enriched = [(movies.upsert_movie(p, session, genre_ids, person_ids), p) for p in parsed_list]
+        genre_ids = self.reference.upsert_genres({g for p in parsed_list for g in p.genres})
+        person_ids = self.reference.upsert_persons({n for p in parsed_list for n, _ in p.persons})
+        enriched = [(movies.upsert_movie(p, self.movies, genre_ids, person_ids), p) for p in parsed_list]
 
-        snapshots = facts.write_rating_snapshots(enriched, source_ids, calendar.date_id(today), session)
+        snapshots = facts.write_rating_snapshots(enriched, source_ids, calendar.date_id(today), self.facts)
         session.commit()
         logger.info("silver enrichment: done (movies_enriched=%d, snapshots=%d)", len(enriched), snapshots)
         return SilverEnrichmentResult(len(enriched), snapshots)

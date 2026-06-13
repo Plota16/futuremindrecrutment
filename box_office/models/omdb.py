@@ -9,10 +9,8 @@ from typing import Optional
 
 @dataclass
 class OmdbResult:
-    title_queried: str
     found: bool
     raw_json: str       # exact response body, stored verbatim in bronze
-    payload: dict
 
 
 @dataclass
@@ -32,7 +30,7 @@ class ParsedRating:
 
 @dataclass
 class ParsedMovie:
-    title: str              # queried (CSV) title — natural key
+    title: str
     released_date: Optional[date]
     runtime_min: Optional[int]
     plot: Optional[str]

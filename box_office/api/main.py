@@ -178,5 +178,5 @@ def health() -> HealthStatus:
     return HealthStatus(
         status="ok" if db_ok else "degraded",
         db_ok=db_ok,
-        omdb_key_present=bool(config.settings.omdb_api_key),
+        omdb_key_present=bool(config.get_settings().omdb_api_key),
     )
