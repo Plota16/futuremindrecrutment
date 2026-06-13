@@ -1,0 +1,25 @@
+[project]
+name = "box-office"
+version = "0.1.0"
+description = "Box office data warehouse — FutureMind recruitment task (ingest revenues_per_day.csv + OMDb, dimensional model, ranking dashboard)"
+authors = [{ name = "Michal Plocki", email = "michalplocki2@gmail.com" }]
+readme = "README.md"
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "sqlmodel>=0.0.22",
+    "pandas>=2.2",
+    "requests>=2.32",
+    "holidays>=0.50",
+    "streamlit>=1.40",
+    "fastapi (>=0.136.3,<0.137.0)",
+]
+
+[tool.poetry]
+packages = [{ include = "box_office" }]
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.2"
+
+[build-system]
+requires = ["poetry-core>=2.0.0"]
+build-backend = "poetry.core.masonry.api"

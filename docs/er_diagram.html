@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Box Office — Entity Relationship Diagram</title>
+<style>
+  :root{
+    --txt:#1a1a18; --txt2:#6b6a64; --line:#8a8980;
+    --bg:#ffffff; --surface:#ffffff;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --txt:#e9e8e3; --txt2:#a3a299; --line:#7d7c74; --bg:#1a1a18; --surface:#26261f; }
+  }
+  html,body{background:var(--bg);margin:0}
+  body{padding:26px 22px 40px;font-family:var(--sans);color:var(--txt)}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+  h1{font-size:17px;font-weight:750;margin:0 0 10px}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:0 0 18px;font-size:12px;color:var(--txt2)}
+  .legend i{width:11px;height:11px;border-radius:3px;display:inline-block;vertical-align:-1px;margin-right:5px}
+  .tag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 4px;border-radius:4px;line-height:1.5}
+  .scroll{overflow-x:auto;padding-bottom:8px}
+  #canvas{position:relative;width:1200px;height:600px}
+  #canvas svg{position:absolute;inset:0;width:1200px;height:600px;z-index:0;pointer-events:none}
+  .ent{position:absolute;z-index:1;border:1px solid var(--line);border-radius:9px;overflow:hidden;background:var(--surface);width:160px;
+       box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .ent .h{padding:6px 9px;font-size:12px;font-weight:750;letter-spacing:.2px;border-bottom:1px solid var(--line);white-space:nowrap}
+  .ent ul{list-style:none;margin:0;padding:3px 0}
+  .ent li{display:flex;align-items:center;gap:5px;padding:1.5px 9px;font-size:10.5px;font-family:var(--mono);color:var(--txt)}
+  .ent li .nm{white-space:nowrap}
+  .ent li.pk .nm{font-weight:700;text-decoration:underline;text-underline-offset:2px}
+  .ent li .t-pk{background:#FAEEDA;color:#412402}
+  .ent li .t-fk{background:#E6F1FB;color:#042C53}
+  .ent li .spacer{width:18px;flex:0 0 18px}
+</style>
+</head>
+<body>
+<h2 class="sr-only">Entity relationship diagram of a box-office star schema: two fact tables, six dimensions and two bridge tables with composite primary keys, linked by one-to-many crow's-foot relationships.</h2>
+<h1>Box Office Data Warehouse — ER Diagram</h1>
+<div class="legend">
+  <span><i style="background:#FAECE7"></i>Fact</span>
+  <span><i style="background:#E1F5EE"></i>Dimension</span>
+  <span><i style="background:#F1EFE8"></i>Bridge</span>
+  <span style="opacity:.45">|</span>
+  <span><span class="tag t-pk">PK</span> primary key</span>
+  <span><span class="tag t-fk">FK</span> foreign key</span>
+</div>
+<div class="scroll"><div id="canvas"><svg id="links" viewBox="0 0 1200 600"></svg></div></div>
+<script>
+(function(){
+  var HEAD={fact:{bg:'#FAECE7',fg:'#4A1B0C'},dim:{bg:'#E1F5EE',fg:'#04342C'},bridge:{bg:'#F1EFE8',fg:'#2C2C2A'}};
+  function a(n,k){return {n:n,k:k||null};}
+  var E={
+    DIM_DATE:{kind:'dim',x:0,y:80,w:174,attrs:[a('DATE_ID','PK'),a('FULL_DATE'),a('IS_WEEKEND'),a('IS_HOLIDAY'),a('HOLIDAY_NAME'),a('LOAD_TIMESTAMP')]},
+    DIM_RATING_SOURCE:{kind:'dim',x:0,y:440,w:174,attrs:[a('SOURCE_ID','PK'),a('SOURCE_NAME'),a('SCALE_MAX'),a('SCALE_UNIT'),a('LOAD_TIMESTAMP')]},
+    FACT_DAILY_REVENUE:{kind:'fact',x:250,y:58,w:204,attrs:[a('DATE_ID','PK FK'),a('MOVIE_VERSION_ID','PK FK'),a('REVENUE'),a('THEATERS'),a('LOAD_TIMESTAMP')]},
+    FACT_MOVIE_RATING:{kind:'fact',x:250,y:330,w:204,attrs:[a('MOVIE_ID','PK FK'),a('SOURCE_ID','PK FK'),a('SNAPSHOT_DATE_ID','PK FK'),a('RATING_VALUE_NATIVE'),a('VOTES'),a('LOAD_TIMESTAMP')]},
+    DIM_DISTRIBUTOR:{kind:'dim',x:528,y:0,w:188,attrs:[a('DISTRIBUTOR_ID','PK'),a('DISTRIBUTOR_NAME'),a('LOAD_TIMESTAMP')]},
+    DIM_MOVIE:{kind:'dim',x:528,y:120,w:200,attrs:[a('MOVIE_VERSION_ID','PK'),a('MOVIE_ID'),a('TITLE'),a('YEAR_NUM'),a('RATED'),a('RELEASED_DATE'),a('RUNTIME_MIN'),a('PLOT'),a('LANGUAGE'),a('COUNTRY'),a('POSTER_URL'),a('DISTRIBUTOR_ID','FK'),a('VALID_FROM'),a('VALID_TO'),a('IS_CURRENT'),a('LOAD_TIMESTAMP')]},
+    BRIDGE_MOVIE_GENRE:{kind:'bridge',x:802,y:130,w:198,attrs:[a('MOVIE_ID','PK FK'),a('GENRE_ID','PK FK'),a('LOAD_TIMESTAMP')]},
+    BRIDGE_MOVIE_PERSON:{kind:'bridge',x:802,y:360,w:198,attrs:[a('MOVIE_ID','PK FK'),a('PERSON_ID','PK FK'),a('CREDIT_ROLE','PK'),a('LOAD_TIMESTAMP')]},
+    DIM_GENRE:{kind:'dim',x:1036,y:140,w:146,attrs:[a('GENRE_ID','PK'),a('GENRE_NAME'),a('LOAD_TIMESTAMP')]},
+    DIM_PERSON:{kind:'dim',x:1036,y:370,w:146,attrs:[a('PERSON_ID','PK'),a('PERSON_NAME'),a('LOAD_TIMESTAMP')]}
+  };
+  var R=[
+    {one:{id:'DIM_DATE',side:'right',f:.30}, many:{id:'FACT_DAILY_REVENUE',side:'left',f:.5}},
+    {one:{id:'DIM_DATE',side:'right',f:.72}, many:{id:'FACT_MOVIE_RATING',side:'left',f:.35}},
+    {one:{id:'DIM_RATING_SOURCE',side:'right',f:.5}, many:{id:'FACT_MOVIE_RATING',side:'left',f:.72}},
+    {one:{id:'DIM_MOVIE',side:'left',f:.30}, many:{id:'FACT_DAILY_REVENUE',side:'right',f:.5}},
+    {one:{id:'DIM_MOVIE',side:'left',f:.74}, many:{id:'FACT_MOVIE_RATING',side:'right',f:.5}},
+    {one:{id:'DIM_DISTRIBUTOR',side:'bottom',f:.5}, many:{id:'DIM_MOVIE',side:'top',f:.5}},
+    {one:{id:'DIM_MOVIE',side:'right',f:.30}, many:{id:'BRIDGE_MOVIE_GENRE',side:'left',f:.5}},
+    {one:{id:'DIM_MOVIE',side:'right',f:.74}, many:{id:'BRIDGE_MOVIE_PERSON',side:'left',f:.5}},
+    {one:{id:'DIM_GENRE',side:'left',f:.5}, many:{id:'BRIDGE_MOVIE_GENRE',side:'right',f:.5}},
+    {one:{id:'DIM_PERSON',side:'left',f:.5}, many:{id:'BRIDGE_MOVIE_PERSON',side:'right',f:.5}}
+  ];
+
+  var canvas=document.getElementById('canvas');
+  function build(id){
+    var e=E[id], h=HEAD[e.kind];
+    var li=e.attrs.map(function(at){
+      var tag='<span class="spacer"></span>';
+      if(at.k){ tag=at.k.split(' ').map(function(k){return '<span class="tag '+(k==='PK'?'t-pk':'t-fk')+'">'+k+'</span>';}).join(''); }
+      var isPk=at.k&&at.k.indexOf('PK')>-1;
+      return '<li class="'+(isPk?'pk':'')+'">'+tag+'<span class="nm">'+at.n+'</span></li>';
+    }).join('');
+    var d=document.createElement('div');
+    d.className='ent'; d.id='ent-'+id;
+    d.style.left=e.x+'px'; d.style.top=e.y+'px'; d.style.width=e.w+'px';
+    d.innerHTML='<div class="h" style="background:'+h.bg+';color:'+h.fg+'">'+id+'</div><ul>'+li+'</ul>';
+    canvas.appendChild(d);
+  }
+  Object.keys(E).forEach(build);
+
+  var NS='http://www.w3.org/2000/svg', svg=document.getElementById('links');
+  function normal(side){return side==='left'?[-1,0]:side==='right'?[1,0]:side==='top'?[0,-1]:[0,1];}
+  function anchor(id,side,f){
+    var el=document.getElementById('ent-'+id);
+    var x=el.offsetLeft, y=el.offsetTop, w=el.offsetWidth, hh=el.offsetHeight;
+    if(side==='left')  return [x, y+f*hh];
+    if(side==='right') return [x+w, y+f*hh];
+    if(side==='top')   return [x+f*w, y];
+    return [x+f*w, y+hh];
+  }
+  function ln(x1,y1,x2,y2){var l=document.createElementNS(NS,'line');l.setAttribute('x1',x1);l.setAttribute('y1',y1);l.setAttribute('x2',x2);l.setAttribute('y2',y2);l.setAttribute('stroke','var(--line)');l.setAttribute('stroke-width','1.4');svg.appendChild(l);}
+  function crow(p,side){var n=normal(side),px=-n[1],py=n[0];var ax=p[0]+n[0]*15,ay=p[1]+n[1]*15,s=7;
+    ln(ax,ay,p[0],p[1]); ln(ax,ay,p[0]+px*s,p[1]+py*s); ln(ax,ay,p[0]-px*s,p[1]-py*s);}
+  function one(p,side){var n=normal(side),px=-n[1],py=n[0];var cx=p[0]+n[0]*10,cy=p[1]+n[1]*10,s=7;
+    ln(cx+px*s,cy+py*s,cx-px*s,cy-py*s);}
+
+  R.forEach(function(r){
+    var pa=anchor(r.one.id,r.one.side,r.one.f);
+    var pb=anchor(r.many.id,r.many.side,r.many.f);
+    var na=normal(r.one.side), nb=normal(r.many.side);
+    ln(pa[0]+na[0]*10,pa[1]+na[1]*10, pb[0]+nb[0]*15,pb[1]+nb[1]*15);
+    one(pa,r.one.side);
+    crow(pb,r.many.side);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+services:
+  api:
+    build: .
+    image: box-office-api
+    ports:
+      - "8000:8000"
+    environment:
+      OMDB_API_KEY: ${OMDB_API_KEY:-}
+    volumes:
+      - ./data:/app/data        # persist warehouse.db across runs
+    restart: unless-stopped
