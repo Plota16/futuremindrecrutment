@@ -7,6 +7,7 @@ from typing import Iterable
 
 import holidays
 
+from ..constants import WEEKEND_WEEKDAYS
 from ..models import DimDate
 from ..repositories import DateRepository
 
@@ -34,7 +35,7 @@ def ensure_dates(dates: Iterable[date], repo: DateRepository) -> int:
             DimDate(
                 date_id=did,
                 full_date=d,
-                is_weekend=d.weekday() >= 5,
+                is_weekend=d.weekday() in WEEKEND_WEEKDAYS,
                 is_holiday=name is not None,
                 holiday_name=name,
             )

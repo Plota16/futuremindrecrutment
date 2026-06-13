@@ -16,7 +16,6 @@ class BronzeResult:
 
 @dataclass
 class SilverCoreResult:
-
     dates_added: int
     movies: int
     fact_revenue_rows: int
@@ -24,7 +23,6 @@ class SilverCoreResult:
 
 @dataclass
 class SilverEnrichmentResult:
-
     movies_enriched: int
     rating_snapshots: int
 

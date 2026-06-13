@@ -18,5 +18,6 @@ class BridgeMoviePerson(DwhTable, table=True):
     __tablename__ = "bridge_movie_person"
 
     movie_id: int = Field(primary_key=True, foreign_key="dim_movie.movie_id")
-    person_id: int = Field(primary_key=True, foreign_key="dim_person.person_id")
-    credit_role: str = Field(primary_key=True)            # ACTOR | DIRECTOR | WRITER
+    person_id: int = Field(primary_key=True,
+                           foreign_key="dim_person.person_id")
+    credit_role: str = Field(primary_key=True)  # ACTOR | DIRECTOR | WRITER

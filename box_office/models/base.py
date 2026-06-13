@@ -10,5 +10,4 @@ def utcnow() -> datetime:
 
 
 class DwhTable(SQLModel):
-
     load_timestamp: datetime = Field(default_factory=utcnow, nullable=False)

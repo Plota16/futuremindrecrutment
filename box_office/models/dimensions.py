@@ -13,7 +13,8 @@ from .base import DwhTable
 class DimDate(DwhTable, table=True):
     __tablename__ = "dim_date"
 
-    date_id: int = Field(primary_key=True, sa_column_kwargs={"autoincrement": False})
+    date_id: int = Field(primary_key=True,
+                         sa_column_kwargs={"autoincrement": False})
     full_date: date = Field(index=True, unique=True)
     is_weekend: bool = Field(default=False)
     is_holiday: bool = Field(default=False)
@@ -30,7 +31,8 @@ class DimDistributor(DwhTable, table=True):
 class DimRatingSource(DwhTable, table=True):
     __tablename__ = "dim_rating_source"
 
-    source_id: int = Field(primary_key=True, sa_column_kwargs={"autoincrement": False})
+    source_id: int = Field(primary_key=True,
+                           sa_column_kwargs={"autoincrement": False})
     source_name: str = Field(index=True, unique=True)
     scale_max: int
     scale_unit: str

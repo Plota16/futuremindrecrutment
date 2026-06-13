@@ -1,4 +1,4 @@
-"""FastAPI app — endpoints wired to BoxOfficeETL (synchronous, session via Depends)."""
+"""FastAPI app — endpoints wired to BoxOfficeETL"""
 
 from __future__ import annotations
 
@@ -11,7 +11,8 @@ from contextlib import asynccontextmanager, contextmanager
 from pathlib import Path
 from typing import Optional
 
-from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile, status
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile, \
+    status
 from sqlalchemy import text
 from sqlmodel import Session
 
@@ -39,12 +40,12 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="Box Office Warehouse API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Box Office Warehouse API", version="0.1.0",
+              lifespan=lifespan)
 
 
 @contextmanager
 def _csv_source(file: Optional[UploadFile]):
-    """Yield a CSV path: the uploaded file if given, else the bundled demo CSV."""
     if file is not None:
         with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
             shutil.copyfileobj(file.file, tmp)
@@ -55,35 +56,48 @@ def _csv_source(file: Optional[UploadFile]):
             os.unlink(tmp_path)
     else:
         if not Path(config.CSV_PATH).exists():
-            raise HTTPException(status.HTTP_404_NOT_FOUND, f"bundled CSV not found at {config.CSV_PATH}")
+            raise HTTPException(status.HTTP_404_NOT_FOUND,
+                                f"bundled CSV not found at {config.CSV_PATH}")
         yield str(config.CSV_PATH)
 
 
 @app.post("/load/csv", response_model=CsvLoadSummary, tags=["load"])
 def load_csv(
-    file: Optional[UploadFile] = File(None, description="revenues CSV; omit to use the bundled demo file"),
-    session: Session = Depends(get_session),
+        file: Optional[UploadFile] = File(
+            None,
+            description="revenues CSV; omit to use the bundled demo file",
+        ),
+        session: Session = Depends(get_session),
 ) -> CsvLoadSummary:
     """Phase 1 — land the CSV into bronze. Fast, no API."""
-    logger.info("POST /load/csv: start (file=%s)", file.filename if file else "<bundled>")
+    logger.info("POST /load/csv: start (file=%s)",
+                file.filename if file else "<bundled>")
     started = time.perf_counter()
     with _csv_source(file) as csv_path:
         rows = BoxOfficeETL(session).etl_bronze_csv(csv_path)
-    summary = CsvLoadSummary(rows_read=rows, duration_ms=int((time.perf_counter() - started) * 1000))
+    summary = CsvLoadSummary(rows_read=rows, duration_ms=int(
+        (time.perf_counter() - started) * 1000))
     logger.info("POST /load/csv: done in %dms", summary.duration_ms)
     return summary
 
 
 @app.post("/load/omdb", response_model=OmdbLoadSummary, tags=["load"])
 def load_omdb(
-    omdb_limit: Optional[int] = Query(None, description="max API calls this run (daily-quota friendly)"),
-    force: bool = Query(False, description="re-fetch already-cached titles"),
-    session: Session = Depends(get_session),
+        omdb_limit: Optional[int] = Query(
+            None,
+            description="max API calls this run (daily-quota friendly)",
+        ),
+        force: bool = Query(
+            False, description="re-fetch already-cached titles"
+        ),
+        session: Session = Depends(get_session),
 ) -> OmdbLoadSummary:
-    """Phase 2 — fill the OMDb bronze cache (highest-earning titles first, resumable)."""
-    logger.info("POST /load/omdb: start (limit=%s, force=%s)", omdb_limit, force)
+    """Phase 2 — fill the OMDb bronze cache (top earners first)."""
+    logger.info("POST /load/omdb: start (limit=%s, force=%s)", omdb_limit,
+                force)
     started = time.perf_counter()
-    stats = BoxOfficeETL(session).etl_bronze_omdb(omdb_limit=omdb_limit, force=force)
+    stats = BoxOfficeETL(session).etl_bronze_omdb(omdb_limit=omdb_limit,
+                                                  force=force)
     summary = OmdbLoadSummary(
         omdb_requested=stats.requested,
         omdb_skipped_cached=stats.skipped_cached,
@@ -98,7 +112,7 @@ def load_omdb(
 
 @app.post("/load/silver", response_model=SilverSummary, tags=["load"])
 def load_silver(session: Session = Depends(get_session)) -> SilverSummary:
-    """Phase 3 — rebuild silver from the current bronze state (core + whatever is enriched)."""
+    """Phase 3 — rebuild silver from the current bronze state."""
     logger.info("POST /load/silver: start")
     started = time.perf_counter()
     etl = BoxOfficeETL(session)
@@ -118,12 +132,19 @@ def load_silver(session: Session = Depends(get_session)) -> SilverSummary:
 
 @app.post("/load/all", response_model=LoadSummary, tags=["load"])
 def load_all(
-    file: Optional[UploadFile] = File(None, description="revenues CSV; omit to use the bundled demo file"),
-    omdb_limit: Optional[int] = Query(None, description="max API calls (omit = no limit, ignores daily quota)"),
-    session: Session = Depends(get_session),
+        file: Optional[UploadFile] = File(
+            None,
+            description="revenues CSV; omit to use the bundled demo file",
+        ),
+        omdb_limit: Optional[int] = Query(
+            None,
+            description="max API calls (omit = no limit, ignores quota)",
+        ),
+        session: Session = Depends(get_session),
 ) -> LoadSummary:
-    """Convenience — run all phases end to end (CSV + OMDb + silver). For dev/demo."""
-    logger.info("POST /load/all: start (file=%s, limit=%s)", file.filename if file else "<bundled>", omdb_limit)
+    """Run all phases end to end (CSV + OMDb + silver). For dev/demo."""
+    logger.info("POST /load/all: start (file=%s, limit=%s)",
+                file.filename if file else "<bundled>", omdb_limit)
     started = time.perf_counter()
     with _csv_source(file) as csv_path:
         result = BoxOfficeETL(session).run(csv_path, omdb_limit=omdb_limit)
@@ -145,18 +166,20 @@ def load_all(
 
 @app.post("/refresh/movies", response_model=RefreshSummary, tags=["refresh"])
 def refresh_movies(
-    scope: RefreshScope = Query(RefreshScope.stale),
-    stale_days: int = Query(7, ge=0),
-    movie_ids: list[int] = Query(default=[]),
-    omdb_limit: Optional[int] = Query(None),
-    session: Session = Depends(get_session),
+        scope: RefreshScope = Query(RefreshScope.stale),
+        stale_days: int = Query(7, ge=0),
+        movie_ids: list[int] = Query(default=[]),
+        omdb_limit: Optional[int] = Query(None),
+        session: Session = Depends(get_session),
 ) -> RefreshSummary:
     logger.info("POST /refresh/movies: start (scope=%s)", scope.value)
     started = time.perf_counter()
     r = BoxOfficeETL(session).etl_refresh(
-        scope=scope.value, stale_days=stale_days, movie_ids=movie_ids or None, omdb_limit=omdb_limit
+        scope=scope.value, stale_days=stale_days, movie_ids=movie_ids or None,
+        omdb_limit=omdb_limit
     )
-    logger.info("POST /refresh/movies: done in %dms", int((time.perf_counter() - started) * 1000))
+    logger.info("POST /refresh/movies: done in %dms",
+                int((time.perf_counter() - started) * 1000))
     return RefreshSummary(
         movies_checked=r.movies_checked,
         omdb_calls=r.omdb_calls,

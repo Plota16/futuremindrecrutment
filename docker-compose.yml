@@ -9,3 +9,21 @@ services:
     volumes:
       - ./data:/app/data        # persist warehouse.db across runs
     restart: unless-stopped
+
+  dashboard:
+    build: .
+    image: box-office-api
+    depends_on:
+      - api
+    command:
+      - streamlit
+      - run
+      - box_office/gold/app.py
+      - --server.port=8501
+      - --server.address=0.0.0.0
+      - --server.headless=true
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data        # read the same warehouse.db the api writes
+    restart: unless-stopped

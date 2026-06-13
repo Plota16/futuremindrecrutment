@@ -10,7 +10,7 @@ from typing import Optional
 @dataclass
 class OmdbResult:
     found: bool
-    raw_json: str       # exact response body, stored verbatim in bronze
+    raw_json: str  # exact response body, stored verbatim in bronze
 
 
 @dataclass
@@ -24,7 +24,7 @@ class OmdbFetchStats:
 
 @dataclass
 class ParsedRating:
-    source_name: str        # matches dim_rating_source.source_name
+    source_name: str  # matches dim_rating_source.source_name
     value_native: float
 
 
@@ -37,6 +37,6 @@ class ParsedMovie:
     language: Optional[str]
     country: Optional[str]
     genres: list[str]
-    persons: list[tuple[str, str]]   # (name, role)
+    persons: list[tuple[str, str]]  # (name, role)
     ratings: list[ParsedRating]
     votes: Optional[int]

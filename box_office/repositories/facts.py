@@ -14,7 +14,7 @@ class FactRepository:
         self.session = session
 
     def read_revenue_grain(self):
-        """Raw revenue rows from bronze, at the grain needed to build fact_daily_revenue."""
+        """Raw revenue rows from bronze, at the grain for the fact."""
         return self.session.exec(
             select(
                 BronzeRevenueCsv.title,
@@ -27,20 +27,22 @@ class FactRepository:
 
     def replace_daily_revenue(self, df: pd.DataFrame) -> None:
         self.session.execute(delete(FactDailyRevenue))
-        df.to_sql(FactDailyRevenue.__tablename__, self.session.connection(), if_exists="append", index=False)
+        df.to_sql(FactDailyRevenue.__tablename__, self.session.connection(),
+                  if_exists="append", index=False)
 
     def delete_rating_snapshots(self, snapshot_date_id: int) -> None:
         self.session.execute(
-            delete(FactMovieRating).where(FactMovieRating.snapshot_date_id == snapshot_date_id)
+            delete(FactMovieRating).where(
+                FactMovieRating.snapshot_date_id == snapshot_date_id)
         )
 
     def add_rating(
-        self,
-        movie_id: int,
-        source_id: int,
-        snapshot_date_id: int,
-        rating_value_native: float,
-        votes: int | None,
+            self,
+            movie_id: int,
+            source_id: int,
+            snapshot_date_id: int,
+            rating_value_native: float,
+            votes: int | None,
     ) -> None:
         self.session.add(
             FactMovieRating(

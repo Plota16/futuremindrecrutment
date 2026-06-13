@@ -10,13 +10,15 @@ from ..repositories import FactRepository, MovieRepository, ReferenceRepository
 
 
 def build_daily_revenue(
-    facts: FactRepository,
-    movies: MovieRepository,
-    reference: ReferenceRepository,
+        facts: FactRepository,
+        movies: MovieRepository,
+        reference: ReferenceRepository,
 ) -> int:
-    """Rebuild fact_daily_revenue from bronze: resolve movie/date/distributor, aggregate to grain."""
+    """Rebuild fact_daily_revenue from bronze, aggregated to grain."""
     rows = facts.read_revenue_grain()
-    df = pd.DataFrame(rows, columns=["title", "event_date", "revenue", "theaters", "distributor"])
+    df = pd.DataFrame(rows,
+                      columns=["title", "event_date", "revenue", "theaters",
+                               "distributor"])
     if df.empty:
         return 0
 
@@ -26,10 +28,13 @@ def build_daily_revenue(
     df["movie_id"] = df["title"].map(movie_ids)
     df = df.dropna(subset=["movie_id"])
     df["movie_id"] = df["movie_id"].astype(int)
-    df["distributor_id"] = df["distributor"].map(dist_ids).fillna(UNKNOWN_ID).astype(int)
+    df["distributor_id"] = df["distributor"].map(dist_ids).fillna(
+        UNKNOWN_ID).astype(int)
 
     event = pd.to_datetime(df["event_date"])
-    df["date_id"] = (event.dt.year * 10000 + event.dt.month * 100 + event.dt.day).astype(int)
+    df["date_id"] = (
+        event.dt.year * 10000 + event.dt.month * 100 + event.dt.day
+    ).astype(int)
 
     agg = df.groupby(["date_id", "movie_id"], as_index=False).agg(
         revenue=("revenue", "sum"),
@@ -45,11 +50,12 @@ def build_daily_revenue(
 
 
 def write_rating_snapshots(
-    items, source_ids: dict[str, int], snapshot_date_id: int, facts: FactRepository
+        items, source_ids: dict[str, int], snapshot_date_id: int,
+        facts: FactRepository
 ) -> int:
-    """Write one rating snapshot per (movie, source) for snapshot_date_id (idempotent for the day).
+    """Write one rating snapshot per (movie, source) for the day.
 
-    `items` is an iterable of (movie_id, ParsedMovie). votes attach to the IMDb row only.
+    `items` is an iterable of (movie_id, ParsedMovie); votes are IMDb-only.
     """
     facts.delete_rating_snapshots(snapshot_date_id)
 
@@ -59,12 +65,13 @@ def write_rating_snapshots(
             source_id = source_ids.get(rating.source_name)
             if source_id is None:
                 continue
+            is_imdb = rating.source_name == IMDB_SOURCE
             facts.add_rating(
                 movie_id=movie_id,
                 source_id=source_id,
                 snapshot_date_id=snapshot_date_id,
                 rating_value_native=rating.value_native,
-                votes=parsed.votes if rating.source_name == IMDB_SOURCE else None,
+                votes=parsed.votes if is_imdb else None,
             )
             count += 1
     return count

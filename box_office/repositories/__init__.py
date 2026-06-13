@@ -1,4 +1,4 @@
-from .calendar import DateRepository
+from .date import DateRepository
 from .facts import FactRepository
 from .movies import MovieRepository
 from .omdb import OmdbRepository

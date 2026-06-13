@@ -1,32 +1,41 @@
 """Static, non-environment constants: domain values, seed data, client tuning.
 
 Environment-driven settings (keys, URLs, worker counts) live in `config.py`.
-This module holds values that are fixed by the data model and the OMDb contract.
+This module holds values fixed by the data model and the OMDb contract.
 """
 
 from __future__ import annotations
 
-# --- Warehouse dimensions ------------------------------------------------
-
-# Conventional "Unknown" dimension member; real surrogates autoincrement from 1.
+# Conventional "Unknown" member; real surrogates autoincrement from 1.
 UNKNOWN_ID = 0
 
+# Rating source names — must match OMDb Ratings[].Source verbatim.
+# IMDB_SOURCE also carries the vote counts.
+IMDB_SOURCE = "Internet Movie Database"
+ROTTEN_TOMATOES_SOURCE = "Rotten Tomatoes"
+METACRITIC_SOURCE = "Metacritic"
+
 # Rating sources seeded into dim_rating_source.
-# (source_id, name, scale_max, scale_unit) — name matches OMDb Ratings[].Source.
+# (source_id, name, scale_max, scale_unit)
 RATING_SOURCES: list[tuple[int, str, int, str]] = [
-    (1, "Internet Movie Database", 10, "decimal"),
-    (2, "Rotten Tomatoes", 100, "percentage"),
-    (3, "Metacritic", 100, "points"),
+    (1, IMDB_SOURCE, 10, "decimal"),
+    (2, ROTTEN_TOMATOES_SOURCE, 100, "percentage"),
+    (3, METACRITIC_SOURCE, 100, "points"),
 ]
 
-# The rating source that carries IMDb vote counts.
-IMDB_SOURCE = "Internet Movie Database"
+# Credit roles stored in bridge_movie_person.credit_role.
+CREDIT_ACTOR = "ACTOR"
+CREDIT_DIRECTOR = "DIRECTOR"
+CREDIT_WRITER = "WRITER"
 
-# --- Bronze CSV landing --------------------------------------------------
+# How many rows each ranking shows.
+TOP_N = 5
+
+# Weekdays (date.weekday(): Mon=0 … Sun=6) treated as "weekend" for dim_date.
+# Friday is included as a weekend day per business definition.
+WEEKEND_WEEKDAYS = {4, 5, 6}  # Fri, Sat, Sun
 
 CSV_COLUMNS = ["id", "date", "title", "revenue", "theaters", "distributor"]
-
-# --- OMDb HTTP client tuning ---------------------------------------------
 
 # Pool generously so concurrent workers don't queue on connections.
 OMDB_POOL_SIZE = 32

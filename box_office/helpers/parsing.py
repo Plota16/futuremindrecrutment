@@ -6,9 +6,9 @@ import re
 from datetime import date, datetime
 from typing import Optional
 
+from ..constants import CREDIT_ACTOR as ACTOR, CREDIT_DIRECTOR as DIRECTOR, \
+    CREDIT_WRITER as WRITER
 from ..models.omdb import ParsedMovie, ParsedRating
-
-ACTOR, DIRECTOR, WRITER = "ACTOR", "DIRECTOR", "WRITER"
 
 _NA = {"", "N/A", "NA"}
 _PARENS = re.compile(r"\s*\([^)]*\)")
@@ -63,7 +63,8 @@ def _genres(value: Optional[str]) -> list[str]:
     v = _clean(value)
     if not v:
         return []
-    return [g.strip() for g in v.split(",") if g.strip() and g.strip() not in _NA]
+    return [g.strip() for g in v.split(",") if
+            g.strip() and g.strip() not in _NA]
 
 
 def _rating_value(value: str) -> float:

@@ -6,11 +6,13 @@ import logging
 
 
 def configure_logging(level: int = logging.INFO) -> None:
-    logging.basicConfig(level=level, format="%(asctime)s %(levelname)-5s %(name)s | %(message)s")
+    fmt = "%(asctime)s %(levelname)-5s %(name)s | %(message)s"
+    logging.basicConfig(level=level, format=fmt)
 
 
-def log_progress(logger: logging.Logger, label: str, done: int, total: int, step_pct: int = 5) -> None:
-    """Log `done/total` only when crossing each `step_pct` boundary (and at the end)."""
+def log_progress(logger: logging.Logger, label: str, done: int, total: int,
+                 step_pct: int = 5) -> None:
+    """Log done/total only when crossing each step_pct boundary."""
     if total <= 0:
         return
     step = max(1, total * step_pct // 100)

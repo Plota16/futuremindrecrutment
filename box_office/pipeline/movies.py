@@ -9,9 +9,10 @@ from ..repositories import MovieRepository
 
 
 def ensure_movies(titles, repo: MovieRepository) -> dict[str, int]:
-    """Ensure a dim_movie row exists for every title (bare if not OMDb-enriched). Returns title->id."""
+    """Ensure a dim_movie row per title; returns title->id."""
     existing = repo.title_to_id()
-    new = [DimMovie(title=t) for t in sorted({x for x in titles if x}) if t not in existing]
+    new = [DimMovie(title=t) for t in sorted({x for x in titles if x}) if
+           t not in existing]
     if new:
         repo.add_all(new)
         for movie in new:
@@ -20,12 +21,12 @@ def ensure_movies(titles, repo: MovieRepository) -> dict[str, int]:
 
 
 def upsert_movie(
-    parsed: ParsedMovie,
-    repo: MovieRepository,
-    genre_ids: dict[str, int],
-    person_ids: dict[str, int],
+        parsed: ParsedMovie,
+        repo: MovieRepository,
+        genre_ids: dict[str, int],
+        person_ids: dict[str, int],
 ) -> int:
-    """Insert or overwrite the movie by its title; rebuild its bridges. Returns movie_id."""
+    """Upsert the movie by title; rebuild bridges. Returns movie_id."""
     movie = repo.get_by_title(parsed.title)
     if movie is None:
         movie = DimMovie(title=parsed.title)
@@ -43,7 +44,8 @@ def upsert_movie(
     return movie.movie_id
 
 
-def _rebuild_bridges(repo: MovieRepository, movie_id, parsed, genre_ids, person_ids) -> None:
+def _rebuild_bridges(repo: MovieRepository, movie_id, parsed, genre_ids,
+                     person_ids) -> None:
     repo.delete_bridges(movie_id)
 
     for name in dict.fromkeys(parsed.genres):

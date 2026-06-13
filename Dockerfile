@@ -2,6 +2,7 @@ FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app \
     PIP_NO_CACHE_DIR=1 \
     POETRY_VERSION=2.3.2 \
     POETRY_VIRTUALENVS_CREATE=false \
@@ -19,5 +20,6 @@ RUN poetry install --only main --no-root
 COPY box_office ./box_office
 COPY revenues_per_day.csv ./revenues_per_day.csv
 
-EXPOSE 8000
+# 8000 = FastAPI (default CMD); 8501 = Streamlit dashboard (see docker-compose `dashboard`).
+EXPOSE 8000 8501
 CMD ["uvicorn", "box_office.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
