@@ -22,8 +22,10 @@ def init_db() -> None:
     SQLModel.metadata.create_all(engine)
 
 
-def get_session() -> Session:
-    return Session(engine)
+def get_session():
+    """FastAPI dependency — yields a request-scoped session."""
+    with Session(engine) as session:
+        yield session
 
 
 if __name__ == "__main__":

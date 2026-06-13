@@ -12,7 +12,7 @@ class BronzeRevenueCsv(DwhTable, table=True):
     __tablename__ = "bronze_revenue_csv"
 
     bronze_revenue_id: Optional[int] = Field(default=None, primary_key=True)
-    row_uuid: str = Field(index=True)  # original CSV `id`
+    row_uuid: str  # original CSV `id` (not indexed — never queried by it)
     event_date: date
     title: str = Field(index=True)
     revenue: int
