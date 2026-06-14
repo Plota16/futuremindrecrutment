@@ -59,12 +59,17 @@ def _names(value: Optional[str]) -> list[str]:
     return names
 
 
-def _genres(value: Optional[str]) -> list[str]:
+def _csv_list(value: Optional[str]) -> list[str]:
+    """Split a comma-separated OMDb string (genres, languages, countries…)."""
     v = _clean(value)
     if not v:
         return []
-    return [g.strip() for g in v.split(",") if
-            g.strip() and g.strip() not in _NA]
+    return [item.strip() for item in v.split(",")
+            if item.strip() and item.strip() not in _NA]
+
+
+def _genres(value: Optional[str]) -> list[str]:
+    return _csv_list(value)
 
 
 def _rating_value(value: str) -> float:
@@ -97,8 +102,8 @@ def parse_omdb(payload: dict, title: str) -> ParsedMovie:
         released_date=_released(payload.get("Released")),
         runtime_min=_runtime(payload.get("Runtime")),
         plot=_clean(payload.get("Plot")),
-        language=_clean(payload.get("Language")),
-        country=_clean(payload.get("Country")),
+        languages=_csv_list(payload.get("Language")),
+        countries=_csv_list(payload.get("Country")),
         genres=_genres(payload.get("Genre")),
         persons=persons,
         ratings=_ratings(payload.get("Ratings")),

@@ -77,6 +77,18 @@ def revenue_by_daytype() -> pd.DataFrame:
         return GoldQueries(s).revenue_by_daytype()
 
 
+@st.cache_data(ttl=60)
+def top_countries(min_movies: int) -> pd.DataFrame:
+    with Session(engine) as s:
+        return GoldQueries(s).top_countries_by_rating(min_movies=min_movies)
+
+
+@st.cache_data(ttl=60)
+def top_genres(min_movies: int) -> pd.DataFrame:
+    with Session(engine) as s:
+        return GoldQueries(s).top_genres_by_rating(min_movies=min_movies)
+
+
 # Rendering helpers.
 
 def render_ranking(df: pd.DataFrame, label_col: str, value_col: str,
@@ -140,6 +152,8 @@ if not years:
     rated_tab,
     holidays_tab,
     daytype_tab,
+    countries_tab,
+    genres_tab,
 ) = st.tabs(
     [
         "Movies by year",
@@ -150,6 +164,8 @@ if not years:
         "Top rated",
         "Top holidays",
         "Weekend/Holiday vs Weekday",
+        "Countries by rating",
+        "Genres by rating",
     ]
 )
 
@@ -195,3 +211,31 @@ with daytype_tab:
     st.subheader("Box office share — Weekend/Holiday vs Weekday")
     render_pie(revenue_by_daytype(), category_col="day_type",
                value_col="box_office")
+
+with countries_tab:
+    st.subheader("Countries — best average rating (0-100, normalized)")
+    min_c = st.slider(
+        "Minimum rated films per country", 1, 10, 2, key="min_c"
+    )
+    df_c = top_countries(min_c)
+    if df_c.empty:
+        st.info(
+            "No country has enough rated films yet. "
+            "Lower the minimum or run the OMDb enrichment first."
+        )
+    else:
+        render_ranking(df_c, label_col="country", value_col="avg_score")
+
+with genres_tab:
+    st.subheader("Genres — best average rating (0-100, normalized)")
+    min_g = st.slider(
+        "Minimum rated films per genre", 1, 10, 2, key="min_g"
+    )
+    df_g = top_genres(min_g)
+    if df_g.empty:
+        st.info(
+            "No genre has enough rated films yet. "
+            "Lower the minimum or run the OMDb enrichment first."
+        )
+    else:
+        render_ranking(df_g, label_col="genre", value_col="avg_score")

@@ -165,6 +165,90 @@ class GoldQueries:
             """
         )
 
+    def top_countries_by_rating(
+        self, limit: int = TOP_N, min_movies: int = 2
+    ) -> pd.DataFrame:
+        """Countries ranked by average normalized rating of their films.
+
+        Films are attributed to every country listed in bridge_movie_country.
+        Each film's score is the mean normalized rating across all sources
+        (latest snapshot only). Only countries with at least `min_movies`
+        rated films are included.
+        """
+        return self._df(
+            """
+            WITH latest AS (
+                SELECT r.movie_id,
+                       r.rating_value_native * 100.0 / s.scale_max
+                           AS normalized,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY r.movie_id, r.source_id
+                           ORDER BY r.snapshot_date_id DESC
+                       ) AS rn
+                FROM fact_movie_rating r
+                JOIN dim_rating_source s ON s.source_id = r.source_id
+            ),
+            movie_score AS (
+                SELECT movie_id, AVG(normalized) AS avg_score
+                FROM latest
+                WHERE rn = 1
+                GROUP BY movie_id
+            )
+            SELECT c.country_name AS country,
+                   ROUND(AVG(ms.avg_score), 1) AS avg_score,
+                   COUNT(DISTINCT b.movie_id) AS movies
+            FROM bridge_movie_country b
+            JOIN dim_country c ON c.country_id = b.country_id
+            JOIN movie_score ms ON ms.movie_id = b.movie_id
+            GROUP BY c.country_id, c.country_name
+            HAVING COUNT(DISTINCT b.movie_id) >= :min_movies
+            ORDER BY avg_score DESC
+            LIMIT :limit
+            """,
+            {"min_movies": min_movies, "limit": limit},
+        )
+
+    def top_genres_by_rating(
+        self, limit: int = TOP_N, min_movies: int = 2
+    ) -> pd.DataFrame:
+        """Genres ranked by average normalized rating across their films.
+
+        Same normalization as top_rated_movies (0-100 scale). Only genres
+        with at least `min_movies` rated films are included.
+        """
+        return self._df(
+            """
+            WITH latest AS (
+                SELECT r.movie_id,
+                       r.rating_value_native * 100.0 / s.scale_max
+                           AS normalized,
+                       ROW_NUMBER() OVER (
+                           PARTITION BY r.movie_id, r.source_id
+                           ORDER BY r.snapshot_date_id DESC
+                       ) AS rn
+                FROM fact_movie_rating r
+                JOIN dim_rating_source s ON s.source_id = r.source_id
+            ),
+            movie_score AS (
+                SELECT movie_id, AVG(normalized) AS avg_score
+                FROM latest
+                WHERE rn = 1
+                GROUP BY movie_id
+            )
+            SELECT g.genre_name AS genre,
+                   ROUND(AVG(ms.avg_score), 1) AS avg_score,
+                   COUNT(DISTINCT b.movie_id) AS movies
+            FROM bridge_movie_genre b
+            JOIN dim_genre g ON g.genre_id = b.genre_id
+            JOIN movie_score ms ON ms.movie_id = b.movie_id
+            GROUP BY g.genre_id, g.genre_name
+            HAVING COUNT(DISTINCT b.movie_id) >= :min_movies
+            ORDER BY avg_score DESC
+            LIMIT :limit
+            """,
+            {"min_movies": min_movies, "limit": limit},
+        )
+
     def top_theaters_peak(self, limit: int = TOP_N) -> pd.DataFrame:
         """Films ranked by peak theater count, with the day it occurred.
 

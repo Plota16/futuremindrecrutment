@@ -11,7 +11,14 @@ from typing import Iterable
 from sqlmodel import Session, select
 
 from ...constants import RATING_SOURCES, UNKNOWN_ID
-from ...models import DimDistributor, DimGenre, DimPerson, DimRatingSource
+from ...models import (
+    DimCountry,
+    DimDistributor,
+    DimGenre,
+    DimLanguage,
+    DimPerson,
+    DimRatingSource,
+)
 
 
 class SilverReference:
@@ -45,6 +52,12 @@ class SilverReference:
 
     def upsert_persons(self, names: Iterable[str]) -> dict[str, int]:
         return self._upsert(DimPerson, "person_name", "person_id", names)
+
+    def upsert_languages(self, names: Iterable[str]) -> dict[str, int]:
+        return self._upsert(DimLanguage, "language_name", "language_id", names)
+
+    def upsert_countries(self, names: Iterable[str]) -> dict[str, int]:
+        return self._upsert(DimCountry, "country_name", "country_id", names)
 
     def seed_rating_sources(self) -> dict[str, int]:
         existing = {

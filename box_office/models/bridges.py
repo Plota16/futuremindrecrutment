@@ -21,3 +21,19 @@ class BridgeMoviePerson(DwhTable, table=True):
     person_id: int = Field(primary_key=True,
                            foreign_key="dim_person.person_id")
     credit_role: str = Field(primary_key=True)  # ACTOR | DIRECTOR | WRITER
+
+
+class BridgeMovieLanguage(DwhTable, table=True):
+    __tablename__ = "bridge_movie_language"
+
+    movie_id: int = Field(primary_key=True, foreign_key="dim_movie.movie_id")
+    language_id: int = Field(primary_key=True,
+                             foreign_key="dim_language.language_id")
+
+
+class BridgeMovieCountry(DwhTable, table=True):
+    __tablename__ = "bridge_movie_country"
+
+    movie_id: int = Field(primary_key=True, foreign_key="dim_movie.movie_id")
+    country_id: int = Field(primary_key=True,
+                            foreign_key="dim_country.country_id")

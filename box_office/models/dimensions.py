@@ -52,6 +52,20 @@ class DimPerson(DwhTable, table=True):
     person_name: str = Field(index=True, unique=True)
 
 
+class DimLanguage(DwhTable, table=True):
+    __tablename__ = "dim_language"
+
+    language_id: Optional[int] = Field(default=None, primary_key=True)
+    language_name: str = Field(index=True, unique=True)
+
+
+class DimCountry(DwhTable, table=True):
+    __tablename__ = "dim_country"
+
+    country_id: Optional[int] = Field(default=None, primary_key=True)
+    country_name: str = Field(index=True, unique=True)
+
+
 class DimMovie(DwhTable, table=True):
     __tablename__ = "dim_movie"
 
@@ -60,5 +74,3 @@ class DimMovie(DwhTable, table=True):
     released_date: Optional[date] = None
     runtime_min: Optional[int] = None
     plot: Optional[str] = None
-    language: Optional[str] = None
-    country: Optional[str] = None

@@ -70,6 +70,15 @@ class SilverFacts:
         )
         return len(agg)
 
+    def latest_snapshot_by_movie(self) -> dict[int, int]:
+        """Return {movie_id: max snapshot_date_id} for every rated movie."""
+        result: dict[int, int] = {}
+        for movie_id, snap in self.session.exec(
+            select(FactMovieRating.movie_id, FactMovieRating.snapshot_date_id)
+        ).all():
+            result[movie_id] = max(result.get(movie_id, 0), snap)
+        return result
+
     def write_rating_snapshots(
         self, items, source_ids: dict[str, int], snapshot_date_id: int
     ) -> int:

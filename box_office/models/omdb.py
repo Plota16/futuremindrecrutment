@@ -34,12 +34,12 @@ class ParsedMovie:
     released_date: Optional[date]
     runtime_min: Optional[int]
     plot: Optional[str]
-    language: Optional[str]
-    country: Optional[str]
+    languages: list[str]
+    countries: list[str]
     genres: list[str]
     persons: list[tuple[str, str]]  # (name, role)
     ratings: list[ParsedRating]
     votes: Optional[int]
 
-    def get_names(self):
+    def get_names(self) -> list[str]:
         return [name for name, _ in self.persons]

@@ -12,7 +12,7 @@ from sqlmodel import Session, select
 from ..clients import OmdbClient
 from ..db import init_db, engine
 from ..helpers.parsing import parse_omdb
-from ..models import DimMovie, FactMovieRating
+from ..models import DimMovie
 from ..models.omdb import OmdbFetchStats
 from ..models.results import LoadResult, BronzeResult, SilverCoreResult, \
     SilverEnrichmentResult, SilverResult, RefreshResult
@@ -149,9 +149,16 @@ class BoxOfficeETL:
         person_ids = self.reference.upsert_persons(
             {n for p in parsed for n in p.get_names()}
         )
+        language_ids = self.reference.upsert_languages(
+            {lang for p in parsed for lang in p.languages}
+        )
+        country_ids = self.reference.upsert_countries(
+            {c for p in parsed for c in p.countries}
+        )
 
         enriched = [
-            (self.movies.upsert(p, genre_ids, person_ids), p)
+            (self.movies.upsert(p, genre_ids, person_ids,
+                                language_ids, country_ids), p)
             for p in parsed
         ]
 
@@ -188,20 +195,15 @@ class BoxOfficeETL:
                              silver.rating_snapshots, silver.fact_revenue_rows)
 
     def _titles_to_refresh(self, scope, stale_days, movie_ids) -> list[str]:
-        session = self.session
         if scope == "ids":
-            ids = set(movie_ids or [])
-            return [m.title for m in session.exec(
-                select(DimMovie).where(DimMovie.movie_id.in_(ids))).all()]
+            return self.movies.titles_by_ids(set(movie_ids or []))
         if scope == "all":
-            return [m.title for m in session.exec(select(DimMovie)).all()]
+            return self.movies.all_titles()
 
         cutoff = calc_date_id(date.today() - timedelta(days=stale_days))
-        latest: dict[int, int] = {}
-        for movie_id, snap in session.exec(
-                select(FactMovieRating.movie_id,
-                       FactMovieRating.snapshot_date_id)
-        ).all():
-            latest[movie_id] = max(latest.get(movie_id, 0), snap)
-        return [m.title for m in session.exec(select(DimMovie)).all() if
-                latest.get(m.movie_id, 0) < cutoff]
+        latest = self.facts.latest_snapshot_by_movie()
+        id_to_title = {mid: t for t, mid in self.movies.title_to_id().items()}
+        return [
+            title for mid, title in id_to_title.items()
+            if latest.get(mid, 0) < cutoff
+        ]
