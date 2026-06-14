@@ -9,28 +9,20 @@ from typing import Optional
 
 from sqlmodel import Session, select
 
-from . import calendar, facts, movies
-from ..clients.omdb import OmdbClient
-from ..db import engine, init_db
+from ..clients import OmdbClient
+from ..db import init_db, engine
 from ..helpers.parsing import parse_omdb
 from ..models import DimMovie, FactMovieRating
 from ..models.omdb import OmdbFetchStats
-from ..models.results import (
-    BronzeResult,
-    LoadResult,
-    RefreshResult,
-    SilverCoreResult,
-    SilverEnrichmentResult,
-    SilverResult,
-)
-from ..repositories import (
-    DateRepository,
-    FactRepository,
-    MovieRepository,
-    OmdbRepository,
-    ReferenceRepository,
-    RevenueRepository,
-)
+from ..models.results import LoadResult, BronzeResult, SilverCoreResult, \
+    SilverEnrichmentResult, SilverResult, RefreshResult
+from ..warehouse.silver.calendar import SilverCalendar, calc_date_id
+from ..warehouse.silver.facts import SilverFacts
+from ..warehouse.silver.movies import SilverMovies
+from ..warehouse.bronze.omdb import BronzeOmdb
+from ..warehouse.silver.reference import SilverReference
+from ..warehouse.bronze.revenue import BronzeRevenue
+
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +31,7 @@ def bootstrap() -> None:
     """Create the schema and seed static reference data (on startup)."""
     init_db()
     with Session(engine) as session:
-        ref = ReferenceRepository(session)
+        ref = SilverReference(session)
         ref.seed_rating_sources()
         ref.ensure_unknown_members()
         session.commit()
@@ -49,14 +41,12 @@ class BoxOfficeETL:
     def __init__(self, session: Session,
                  omdb_client: Optional[OmdbClient] = None):
         self.session = session
-        # The orchestrator owns every repository; pipeline steps receive these
-        # instances rather than newing up their own from a bare session.
-        self.revenue = RevenueRepository(session)
-        self.omdb = OmdbRepository(session, client=omdb_client)
-        self.movies = MovieRepository(session)
-        self.facts = FactRepository(session)
-        self.reference = ReferenceRepository(session)
-        self.dates = DateRepository(session)
+        self.calendar = SilverCalendar(session)
+        self.revenue = BronzeRevenue(session)
+        self.omdb = BronzeOmdb(session, client=omdb_client)
+        self.movies = SilverMovies(session)
+        self.facts = SilverFacts(session)
+        self.reference = SilverReference(session)
 
     def run(
             self,
@@ -65,7 +55,8 @@ class BoxOfficeETL:
             skip_existing: bool = True,
     ) -> LoadResult:
         """Full load: bronze then silver."""
-        bronze = self.etl_bronze(csv_path, omdb_limit=omdb_limit,
+        bronze = self.etl_bronze(csv_path,
+                                 omdb_limit=omdb_limit,
                                  skip_existing=skip_existing)
         silver = self.etl_silver()
         return LoadResult(bronze, silver)
@@ -76,7 +67,7 @@ class BoxOfficeETL:
         """Land the CSV 1:1 into bronze. Fast, deterministic, no API."""
         logger.info("bronze csv: start")
         rows = self.revenue.load_csv(csv_path)
-        self.session.commit()  # bronze landing = its own unit of work
+        self.session.commit()
         logger.info("bronze csv: done (rows=%d)", rows)
         return rows
 
@@ -87,8 +78,9 @@ class BoxOfficeETL:
         """Fill the OMDb bronze cache, top earners first. Resumable."""
         logger.info("bronze omdb: start")
         stats = self.omdb.fetch(self.revenue.titles_by_revenue(),
-                                limit=omdb_limit, force=force)
-        self.session.commit()  # OMDb cache (never re-run on rollback)
+                                limit=omdb_limit,
+                                force=force)
+        self.session.commit()
         logger.info("bronze omdb: done (calls=%d, found=%d)", stats.calls,
                     stats.found)
         return stats
@@ -115,18 +107,19 @@ class BoxOfficeETL:
         (natural key only); API attributes backfill later in enrichment.
         """
         logger.info("silver core: start")
-        session = self.session
         today = date.today()
-        dates_added = calendar.ensure_dates(
-            list(self.revenue.distinct_event_dates()) + [today], self.dates)
+        new_dates = list(self.revenue.distinct_event_dates()) + [today]
+        dates_added = self.calendar.ensure_dates(new_dates)
+
         self.reference.ensure_unknown_members()
         self.reference.upsert_distributors(
-            self.revenue.distinct_distributors())
-        movie_ids = movies.ensure_movies(self.revenue.distinct_titles(),
-                                         self.movies)
-        revenue_rows = facts.build_daily_revenue(self.facts, self.movies,
-                                                 self.reference)
-        session.commit()
+            self.revenue.distinct_distributors()
+        )
+        movie_ids = self.movies.ensure(self.revenue.distinct_titles())
+        distr_ids = self.reference.distributor_map()
+        revenue_rows = self.facts.build_daily_revenue(movie_ids, distr_ids)
+
+        self.session.commit()
         logger.info("silver core: done (movies=%d, revenue_rows=%d)",
                     len(movie_ids), revenue_rows)
         return SilverCoreResult(dates_added, len(movie_ids), revenue_rows)
@@ -138,25 +131,34 @@ class BoxOfficeETL:
         API data is "ready" get enriched; the rest fill in as the cache grows.
         """
         logger.info("silver enrichment: start")
-        session = self.session
         today = date.today()
-        calendar.ensure_dates([today], self.dates)
+        self.calendar.ensure_dates([today])
         source_ids = self.reference.seed_rating_sources()
 
-        parsed_list = [parse_omdb(payload, title) for title, payload in
-                       self.omdb.found_payloads()]
-        genre_ids = self.reference.upsert_genres(
-            {g for p in parsed_list for g in p.genres})
-        person_ids = self.reference.upsert_persons(
-            {n for p in parsed_list for n, _ in p.persons})
-        enriched = [
-            (movies.upsert_movie(p, self.movies, genre_ids, person_ids), p) for
-            p in parsed_list]
+        parsed = [
+            parse_omdb(payload, title)
+            for title, payload in self.omdb.found_payloads()
+        ]
 
-        snapshots = facts.write_rating_snapshots(enriched, source_ids,
-                                                 calendar.date_id(today),
-                                                 self.facts)
-        session.commit()
+        # Upsert reference dims once for the whole batch (not per movie):
+        # each upsert scans the full dim table, so batching turns 2N scans
+        # into 2.
+        genre_ids = self.reference.upsert_genres(
+            {g for p in parsed for g in p.genres}
+        )
+        person_ids = self.reference.upsert_persons(
+            {n for p in parsed for n in p.get_names()}
+        )
+
+        enriched = [
+            (self.movies.upsert(p, genre_ids, person_ids), p)
+            for p in parsed
+        ]
+
+        snapshots = self.facts.write_rating_snapshots(
+            enriched, source_ids, calc_date_id(today)
+        )
+        self.session.commit()
         logger.info(
             "silver enrichment: done (movies_enriched=%d, snapshots=%d)",
             len(enriched), snapshots)
@@ -179,7 +181,7 @@ class BoxOfficeETL:
         logger.info("refresh: start (scope=%s)", scope)
         titles = self._titles_to_refresh(scope, stale_days, movie_ids)
         stats = self.omdb.fetch(titles, limit=omdb_limit, force=True)
-        self.session.commit()  # persist the refreshed OMDb cache
+        self.session.commit()
         silver = self.etl_silver()
         logger.info("refresh: done (movies_checked=%d)", len(titles))
         return RefreshResult(len(titles), stats.calls, stats.found,
@@ -194,7 +196,7 @@ class BoxOfficeETL:
         if scope == "all":
             return [m.title for m in session.exec(select(DimMovie)).all()]
 
-        cutoff = calendar.date_id(date.today() - timedelta(days=stale_days))
+        cutoff = calc_date_id(date.today() - timedelta(days=stale_days))
         latest: dict[int, int] = {}
         for movie_id, snap in session.exec(
                 select(FactMovieRating.movie_id,

@@ -11,7 +11,7 @@ import pandas as pd
 from sqlalchemy import text
 from sqlmodel import Session
 
-from ..constants import (
+from box_office.constants import (
     IMDB_SOURCE,
     METACRITIC_SOURCE,
     ROTTEN_TOMATOES_SOURCE,

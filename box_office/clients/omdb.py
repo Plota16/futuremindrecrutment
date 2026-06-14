@@ -8,9 +8,9 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
-from .. import config
-from ..constants import OMDB_POOL_SIZE, OMDB_RETRY_BACKOFF, \
-    OMDB_RETRY_STATUSES, OMDB_RETRY_TOTAL
+from ..config import get_settings
+from ..constants import OMDB_RETRY_BACKOFF, OMDB_RETRY_STATUSES, \
+    OMDB_RETRY_TOTAL, OMDB_POOL_SIZE
 from ..models.omdb import OmdbResult
 
 _RETRY = Retry(
@@ -38,7 +38,7 @@ class OmdbClient:
             timeout: float = 10.0,
             session: Optional[requests.Session] = None,
     ):
-        settings = config.get_settings()
+        settings = get_settings()
         self.api_key = api_key or settings.omdb_api_key
         self.base_url = base_url or settings.omdb_base_url
         self.timeout = timeout

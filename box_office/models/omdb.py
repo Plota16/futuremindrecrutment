@@ -40,3 +40,6 @@ class ParsedMovie:
     persons: list[tuple[str, str]]  # (name, role)
     ratings: list[ParsedRating]
     votes: Optional[int]
+
+    def get_names(self):
+        return [name for name, _ in self.persons]

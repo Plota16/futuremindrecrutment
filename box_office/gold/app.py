@@ -28,12 +28,10 @@ st.title("🎬 Box Office — Ranking Dashboards")
 
 @st.cache_data(ttl=60)
 def available_years() -> list[int]:
-    # The fact table may not exist yet if the dashboard starts before the API's
-    # startup bootstrap has created the schema — treat that as "no data".
     try:
         with Session(engine) as s:
             return GoldQueries(s).available_years()
-    except OperationalError:
+    except (OperationalError, pd.errors.DatabaseError):
         return []
 
 
@@ -58,7 +56,7 @@ def top_role(role: str) -> pd.DataFrame:
 @st.cache_data(ttl=60)
 def top_theaters() -> pd.DataFrame:
     with Session(engine) as s:
-        return GoldQueries(s).top_theaters_peak()
+        return GoldQueries(s).top_theaters_peak(3)
 
 
 @st.cache_data(ttl=60)

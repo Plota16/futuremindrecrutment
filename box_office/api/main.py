@@ -17,18 +17,11 @@ from sqlalchemy import text
 from sqlmodel import Session
 
 from .. import config
-from ..db import engine, get_session
+from ..db import get_session, engine
+from ..etl.etl import bootstrap, BoxOfficeETL
 from ..logging_config import configure_logging
-from ..models.api import (
-    CsvLoadSummary,
-    HealthStatus,
-    LoadSummary,
-    OmdbLoadSummary,
-    RefreshScope,
-    RefreshSummary,
-    SilverSummary,
-)
-from ..pipeline.etl import BoxOfficeETL, bootstrap
+from ..models.api import CsvLoadSummary, OmdbLoadSummary, SilverSummary, \
+    LoadSummary, RefreshScope, RefreshSummary, HealthStatus
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +62,7 @@ def load_csv(
         ),
         session: Session = Depends(get_session),
 ) -> CsvLoadSummary:
-    """Phase 1 — land the CSV into bronze. Fast, no API."""
+    """Phase 1 — land the CSV into bronze."""
     logger.info("POST /load/csv: start (file=%s)",
                 file.filename if file else "<bundled>")
     started = time.perf_counter()
