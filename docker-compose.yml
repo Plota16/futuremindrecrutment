@@ -12,6 +12,7 @@ services:
 
   dashboard:
     image: box-office-api
+    pull_policy: never
     depends_on:
       - api
     command:

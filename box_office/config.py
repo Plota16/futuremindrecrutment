@@ -28,10 +28,4 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Lazily build (and cache) Settings.
-
-    Deferred so importing this module — and everything that transitively
-    imports it — doesn't require a valid OMDB_API_KEY. Tests and OMDb-free
-    code paths can run without the key; the env is only read on first call.
-    """
     return Settings()
