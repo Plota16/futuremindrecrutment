@@ -39,19 +39,26 @@ app = FastAPI(title="Box Office Warehouse API", version="0.1.0",
 
 @contextmanager
 def _csv_source(file: Optional[UploadFile]):
+    """Yield (local_path, stable_source_name) for the CSV.
+
+    When a file is uploaded the local path is a temp file, but the
+    source_name is taken from the original client filename so that
+    repeated uploads of the same file replace the same bronze rows.
+    """
     if file is not None:
+        original_name = Path(file.filename).name if file.filename else "upload.csv"
         with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
             shutil.copyfileobj(file.file, tmp)
             tmp_path = tmp.name
         try:
-            yield tmp_path
+            yield tmp_path, original_name
         finally:
             os.unlink(tmp_path)
     else:
         if not Path(config.CSV_PATH).exists():
             raise HTTPException(status.HTTP_404_NOT_FOUND,
                                 f"bundled CSV not found at {config.CSV_PATH}")
-        yield str(config.CSV_PATH)
+        yield str(config.CSV_PATH), Path(config.CSV_PATH).name
 
 
 @app.post("/load/csv", response_model=CsvLoadSummary, tags=["load"])
@@ -66,8 +73,8 @@ def load_csv(
     logger.info("POST /load/csv: start (file=%s)",
                 file.filename if file else "<bundled>")
     started = time.perf_counter()
-    with _csv_source(file) as csv_path:
-        rows = BoxOfficeETL(session).etl_bronze_csv(csv_path)
+    with _csv_source(file) as (csv_path, source_name):
+        rows = BoxOfficeETL(session).etl_bronze_csv(csv_path, source_name=source_name)
     summary = CsvLoadSummary(rows_read=rows, duration_ms=int(
         (time.perf_counter() - started) * 1000))
     logger.info("POST /load/csv: done in %dms", summary.duration_ms)
@@ -139,8 +146,9 @@ def load_all(
     logger.info("POST /load/all: start (file=%s, limit=%s)",
                 file.filename if file else "<bundled>", omdb_limit)
     started = time.perf_counter()
-    with _csv_source(file) as csv_path:
-        result = BoxOfficeETL(session).run(csv_path, omdb_limit=omdb_limit)
+    with _csv_source(file) as (csv_path, source_name):
+        result = BoxOfficeETL(session).run(csv_path, source_name=source_name,
+                                           omdb_limit=omdb_limit)
     b, s = result.bronze, result.silver
     summary = LoadSummary(
         rows_read=b.rows_read,

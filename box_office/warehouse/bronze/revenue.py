@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 
 import pandas as pd
-from sqlalchemy import delete, func
+from sqlalchemy import func, text
 from sqlmodel import Session, select
 
 from ...constants import CSV_COLUMNS
@@ -16,38 +16,53 @@ from ...models.base import utcnow
 
 logger = logging.getLogger(__name__)
 
+_UPSERT_COLS = [
+    "row_uuid", "event_date", "title", "revenue",
+    "theaters", "distributor", "source_file", "load_timestamp",
+]
+_TMP = "_bronze_revenue_tmp"
+
 
 class BronzeRevenue:
     def __init__(self, session: Session):
         self.session = session
 
-    def load_csv(self, path: str | Path) -> int:
-        """Load the CSV 1:1 into bronze_revenue_csv (re-load replaces)."""
-        name = Path(path).name
+    def load_csv(
+            self, path: str | Path, source_name: str | None = None
+    ) -> int:
+        """Upsert the CSV into bronze_revenue_csv on grain (event_date, title).
+
+        The UNIQUE constraint on (event_date, title) means a revised report
+        for the same day+film replaces the existing row rather than
+        accumulating. Within the incoming file, duplicates on the same grain
+        are resolved by keeping the last occurrence.
+
+        `source_name` is stored in source_file for audit traceability; it
+        should be the original client filename, not a temp-file path.
+        """
+        name = source_name or Path(path).name
         df = pd.read_csv(path, usecols=CSV_COLUMNS, parse_dates=["date"])
         df = df.rename(columns={"id": "row_uuid", "date": "event_date"})
         df["event_date"] = df["event_date"].dt.date
         df["source_file"] = name
         df["load_timestamp"] = utcnow()
 
+        # Deduplicate within the file on the target grain before upserting.
+        df = df.drop_duplicates(subset=["event_date", "title"], keep="last")
         total = len(df)
         logger.info("csv load: start (%d rows from %s)", total, name)
-        self.session.execute(
-            delete(BronzeRevenueCsv).where(
-                BronzeRevenueCsv.source_file == name
-            )
-        )
 
-        table = BronzeRevenueCsv.__tablename__
         conn = self.session.connection()
-        step = max(1, total // 20)  # ~5% chunks
-        for start in range(0, total, step):
-            df.iloc[start: start + step].to_sql(
-                table, conn, if_exists="append", index=False
-            )
-            done = min(start + step, total)
-            logger.info("csv rows %d/%d (%d%%)", done, total,
-                        done * 100 // total)
+
+        # Stage into a throw-away temp table, then INSERT OR REPLACE into
+        # the real table so the UNIQUE constraint resolves conflicts atomically.
+        df[_UPSERT_COLS].to_sql(_TMP, conn, if_exists="replace", index=False)
+        cols = ", ".join(_UPSERT_COLS)
+        conn.execute(text(
+            f"INSERT OR REPLACE INTO {BronzeRevenueCsv.__tablename__}"
+            f" ({cols}) SELECT {cols} FROM {_TMP}"
+        ))
+        conn.execute(text(f"DROP TABLE IF EXISTS {_TMP}"))
 
         self.session.flush()
         logger.info("csv load: done (%d rows)", total)

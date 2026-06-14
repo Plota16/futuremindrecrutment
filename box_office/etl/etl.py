@@ -51,11 +51,13 @@ class BoxOfficeETL:
     def run(
             self,
             csv_path: str | Path,
+            source_name: Optional[str] = None,
             omdb_limit: Optional[int] = None,
             skip_existing: bool = True,
     ) -> LoadResult:
         """Full load: bronze then silver."""
         bronze = self.etl_bronze(csv_path,
+                                 source_name=source_name,
                                  omdb_limit=omdb_limit,
                                  skip_existing=skip_existing)
         silver = self.etl_silver()
@@ -63,10 +65,12 @@ class BoxOfficeETL:
 
     # Phase 1: bronze landing (CSV)
 
-    def etl_bronze_csv(self, csv_path: str | Path) -> int:
+    def etl_bronze_csv(
+            self, csv_path: str | Path, source_name: Optional[str] = None
+    ) -> int:
         """Land the CSV 1:1 into bronze. Fast, deterministic, no API."""
         logger.info("bronze csv: start")
-        rows = self.revenue.load_csv(csv_path)
+        rows = self.revenue.load_csv(csv_path, source_name=source_name)
         self.session.commit()
         logger.info("bronze csv: done (rows=%d)", rows)
         return rows
@@ -88,10 +92,11 @@ class BoxOfficeETL:
     def etl_bronze(
             self,
             csv_path: str | Path,
+            source_name: Optional[str] = None,
             omdb_limit: Optional[int] = None,
             skip_existing: bool = True,
     ) -> BronzeResult:
-        rows = self.etl_bronze_csv(csv_path)
+        rows = self.etl_bronze_csv(csv_path, source_name=source_name)
         stats = self.etl_bronze_omdb(omdb_limit=omdb_limit,
                                      force=not skip_existing)
         return BronzeResult(rows, stats.requested, stats.calls, stats.found,
